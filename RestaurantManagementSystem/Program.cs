@@ -3,32 +3,31 @@ using RestaurantManagementSystem.DataLayer;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services
 builder.Services.AddControllers();
 
-// ✅ Register Dependencies
 builder.Services.AddScoped<BLRegistration>();
+builder.Services.AddScoped<BLLogin>();
+builder.Services.AddScoped<BLTableReservation>();
+builder.Services.AddScoped<BLPayment>();
 builder.Services.AddScoped<SqlServerDB>();
 
-// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// CORS (if using React frontend)
+// CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontend",
-        policy =>
-        {
-            policy.WithOrigins("http://localhost:5174")
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        });
+    options.AddPolicy("MyCorsPolicy", policy =>
+    {
+        policy.SetIsOriginAllowed(origin => new Uri(origin).Host == "localhost")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
 });
 
 var app = builder.Build();
 
-// Swagger
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -37,7 +36,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseCors("AllowFrontend");
+app.UseCors("MyCorsPolicy");
 
 app.UseAuthorization();
 

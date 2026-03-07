@@ -1,4 +1,5 @@
-﻿using System.Data;
+﻿using System;
+using System.Data;
 using Microsoft.Data.SqlClient;
 using RestaurantManagementSystem.DataLayer;
 using RestaurantManagementSystem.Models;
@@ -20,20 +21,36 @@ namespace RestaurantManagementSystem.BusinessLayer
             {
                 string procedureName = "sp_ValidateLogin";
 
-                SqlParameter[] sqlParameters = new SqlParameter[]
+                SqlParameter[] sqlParameters =
                 {
                     new SqlParameter("@EmailId", login.EmailId),
                     new SqlParameter("@Password", login.Password)
                 };
 
-              
-               
+                // Execute Stored Procedure
+                DataTable dt = _db.GetDataTable(
+                    procedureName,
+                    CommandType.StoredProcedure,
+                    sqlParameters
+                );
 
-                return null; // Login failed
+                if (dt != null && dt.Rows.Count > 0)
+                {
+                    DataRow row = dt.Rows[0];
+
+                    return new RegistrationClass
+                    {
+                        FirstName = row["FirstName"]?.ToString(),
+                        LastName = row["LastName"]?.ToString(),
+                        EmailId = row["EmailId"]?.ToString()
+                    };
+                }
+
+                return null;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                throw new Exception("Login Error: " + ex.Message);
+                throw;
             }
         }
     }

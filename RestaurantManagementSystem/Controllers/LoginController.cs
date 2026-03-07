@@ -16,32 +16,34 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         [HttpPost("Login")]
-        public IActionResult Login([FromBody] LoginClass model)
+        public IActionResult Login([FromBody] LoginClass login)
         {
             try
             {
-                if (model == null)
-                    return BadRequest("Invalid Data");
-
-                if (string.IsNullOrWhiteSpace(model.EmailId) ||
-                    string.IsNullOrWhiteSpace(model.Password))
+                // Check if request body is empty
+                if (login == null)
                 {
-                    return BadRequest("All fields are required");
+                    return BadRequest("Login data is required.");
                 }
 
-                // ✅ Call business layer
-                var user = _blLogin.ValidateLogin(model);
-
-                if (user != null)
+                // Validate email and password
+                if (string.IsNullOrEmpty(login.EmailId) || string.IsNullOrEmpty(login.Password))
                 {
-                    return Ok(user); // Login success
+                    return BadRequest("Email and Password are required.");
                 }
 
-                return Unauthorized("Invalid Email or Password");
+                var user = _blLogin.ValidateLogin(login);
+
+                if (user == null)
+                {
+                    return Unauthorized("Invalid Email or Password");
+                }
+
+                return Ok(user);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Server Error: " + ex.Message);
+                return StatusCode(500, "Internal server error: " + ex.Message);
             }
         }
     }

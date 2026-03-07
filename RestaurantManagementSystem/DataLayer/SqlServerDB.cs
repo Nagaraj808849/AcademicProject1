@@ -1,89 +1,104 @@
 ﻿using System.Data;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+
 namespace RestaurantManagementSystem.DataLayer
 {
     public class SqlServerDB
     {
-        public string? conn = string.Empty;
+        private readonly string conn;
+
         public SqlServerDB()
         {
-            var connString = new ConfigurationBuilder().AddJsonFile("appsettings.json").Build().GetSection("ConnectionStrings")["DefaultConnection"];
-            conn = Convert.ToString(connString);
+            IConfiguration configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json")
+                .Build();
+
+            conn = configuration.GetConnectionString("DefaultConnection")
+                   ?? throw new Exception("Connection string not found");
         }
 
+        // Execute SELECT Query
         public DataTable GetDataTable(string query)
         {
-            SqlCommand cmd = new SqlCommand();
-            SqlConnection sqlConn = new SqlConnection();
-            SqlDataAdapter da = new SqlDataAdapter();
-            DataTable tblData = new DataTable();
+            DataTable table = new DataTable();
 
-            cmd.CommandText = query;
-            sqlConn.ConnectionString = conn;
-            sqlConn.Open();
-            cmd.Connection = sqlConn;
-            cmd.CommandType = CommandType.Text;
-            da.SelectCommand = cmd;
-            da.Fill(tblData);
-            sqlConn.Close();
-            return tblData;
+            using (SqlConnection sqlConn = new SqlConnection(conn))
+            using (SqlCommand cmd = new SqlCommand(query, sqlConn))
+            {
+                cmd.CommandType = CommandType.Text;
+
+                sqlConn.Open();
+
+                using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                {
+                    da.Fill(table);
+                }
+            }
+
+            return table;
         }
+
+        // Execute INSERT / UPDATE / DELETE Query
         public int ExecuteOnlyQuery(string query)
         {
-            SqlConnection sqlConn = new SqlConnection();
-            SqlCommand cmd = new SqlCommand();
+            int result;
 
-            cmd.CommandText = query;
-            sqlConn.ConnectionString = conn;
-            sqlConn.Open();
-            cmd.Connection = sqlConn;
-            cmd.CommandType = CommandType.Text;
-            int count = cmd.ExecuteNonQuery();
-            sqlConn.Close();
-            return count;
+            using (SqlConnection sqlConn = new SqlConnection(conn))
+            using (SqlCommand cmd = new SqlCommand(query, sqlConn))
+            {
+                cmd.CommandType = CommandType.Text;
+
+                sqlConn.Open();
+                result = cmd.ExecuteNonQuery();
+            }
+
+            return result;
         }
+
+        // Execute Stored Procedure (SELECT)
         public DataTable GetDataTable(string procedureName, CommandType commandType, params SqlParameter[] parameters)
         {
+            DataTable table = new DataTable();
+
             using (SqlConnection sqlConn = new SqlConnection(conn))
+            using (SqlCommand cmd = new SqlCommand(procedureName, sqlConn))
             {
-                using (SqlCommand cmd = new SqlCommand(procedureName, sqlConn))
+                cmd.CommandType = commandType;
+
+                if (parameters != null && parameters.Length > 0)
+                    cmd.Parameters.AddRange(parameters);
+
+                sqlConn.Open();
+
+                using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                 {
-                    cmd.CommandType = commandType;
-
-                    if (parameters != null)
-                    {
-                        cmd.Parameters.AddRange(parameters);
-                    }
-
-                    sqlConn.Open();
-                    using (SqlDataAdapter da = new SqlDataAdapter(cmd))
-                    {
-                        DataTable tblData = new DataTable();
-                        da.Fill(tblData);
-                        return tblData;
-                    }
+                    da.Fill(table);
                 }
             }
+
+            return table;
         }
-        public int ExecuteNonQuery(string procedureName, CommandType commandType, SqlParameter[] parameters)
-        {
-            int a = 0;
-            using (SqlConnection sqlConn = new SqlConnection(conn))
-            {
-                using (SqlCommand cmd = new SqlCommand(procedureName, sqlConn))
-                {
-                    cmd.CommandType = commandType;
 
-                    if (parameters != null)
-                    {
-                        cmd.Parameters.AddRange(parameters);
-                    }
-                    sqlConn.Open();
-                    a = cmd.ExecuteNonQuery();
-                }
-                sqlConn.Close();
+        // Execute Stored Procedure (INSERT / UPDATE / DELETE)
+        public int ExecuteNonQuery(string procedureName, CommandType commandType, params SqlParameter[] parameters)
+        {
+            int result;
+
+            using (SqlConnection sqlConn = new SqlConnection(conn))
+            using (SqlCommand cmd = new SqlCommand(procedureName, sqlConn))
+            {
+                cmd.CommandType = commandType;
+
+                if (parameters != null && parameters.Length > 0)
+                    cmd.Parameters.AddRange(parameters);
+
+                sqlConn.Open();
+                result = cmd.ExecuteNonQuery();
             }
-            return a;
+
+            return result;
         }
     }
 }
