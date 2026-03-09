@@ -1,4 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using RestaurantManagementSystem.BusinessLayer;
 using RestaurantManagementSystem.Models;
 
@@ -8,11 +12,13 @@ namespace RestaurantManagementSystem.Controllers
     [ApiController]
     public class LoginController : ControllerBase
     {
-        private readonly BLLogin _blLogin;
+        private readonly BLRegistration _blRegistration;
 
-        public LoginController(BLLogin blLogin)
+        private const string JwtKey = "ThisIsMySuperSecretJwtKeyForRestaurantManagementSystem12345";
+
+        public LoginController(BLRegistration blRegistration)
         {
-            _blLogin = blLogin;
+            _blRegistration = blRegistration;
         }
 
         [HttpPost("Login")]
@@ -20,30 +26,52 @@ namespace RestaurantManagementSystem.Controllers
         {
             try
             {
-                // Check if request body is empty
                 if (login == null)
                 {
-                    return BadRequest("Login data is required.");
+                    return BadRequest(new { message = "Invalid login data" });
                 }
 
-                // Validate email and password
-                if (string.IsNullOrEmpty(login.EmailId) || string.IsNullOrEmpty(login.Password))
-                {
-                    return BadRequest("Email and Password are required.");
-                }
-
-                var user = _blLogin.ValidateLogin(login);
+                var user = _blRegistration.ValidateLogin(login);
 
                 if (user == null)
                 {
-                    return Unauthorized("Invalid Email or Password");
+                    return Unauthorized(new { message = "Invalid Email or Password" });
                 }
 
-                return Ok(user);
+                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtKey));
+
+                var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+                var claims = new[]
+                {
+                    new Claim(ClaimTypes.Name, user.EmailId),
+                    new Claim(ClaimTypes.Role, user.Role.ToString()),
+                    new Claim("UserId", user.UserId.ToString())
+                };
+
+                var token = new JwtSecurityToken(
+                    claims: claims,
+                    expires: DateTime.UtcNow.AddHours(2),
+                    signingCredentials: creds
+                );
+
+                var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+
+                return Ok(new
+                {
+                    token = tokenString,
+                    userId = user.UserId,
+                    email = user.EmailId,
+                    role = user.Role
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Internal server error: " + ex.Message);
+                return StatusCode(500, new
+                {
+                    message = "Server Error",
+                    error = ex.Message
+                });
             }
         }
     }
